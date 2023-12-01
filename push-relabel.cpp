@@ -1,136 +1,107 @@
 #include <iostream>
 #include <vector>
+#include <queue>
+#include <limits>
+#include <chrono>
 
 #define IMPLEMENT_GRAPH_HPP
 #include "graph.hpp"
 
 using std::vector;
+using std::queue;
 
 struct push_relabel {
 	graph capacity;
 	graph flow;
 	vector<int> label;
 	vector<int> excess;
-	int s, t;
+	queue<int> queue;
+	int s, t, vertices;
 
-	push_relabel(graph& G, int _s, int _t) : capacity(G), flow(G.vertices), s(_s), t(_t) {
+	push_relabel(graph& G, int _s, int _t) : capacity(G), flow(G.vertices), s(_s), t(_t), vertices(G.vertices) {
 
-		// Create pre-flow
-		excess.resize(flow.vertices, 0);
+		// Initialize excess(x), x[s] = infinity
+		excess.resize(vertices, 0);
+		excess[s] = std::numeric_limits<int>::max();
 
-		for(int v = 0; v < flow.vertices; v ++) {
-			flow.at(s, v) += capacity.at(s, v);
-			flow.at(s, v) += -capacity.at(s, v);
-			excess[v] = capacity.at(s, v);
-		}
+		// Initialize label(l), l[s] = vertices
+		label.resize(vertices, 0);
+		label[s] = vertices;
 
-		// Create labels
-		label.resize(flow.vertices, 0);
-		label[s] = flow.vertices;
+		// Create Pre-Flow, s to v edges
+		for(int v = 0; v < vertices; v ++) 
+			push(s, v);
 
-		// Iterate through push / relabel operations
-		int u = -1;
+		while(queue.size() > 0){
 
-		do{
-			u = active();
+			int u = queue.front();
+			queue.pop();
 
-			// Push to all posible residual edges
-			for(int v = 0; v < flow.vertices; v ++)
-				if(residual(u, v) > 0)
-					push(u, v);
+			// Try push / relabel operations
+			for(int v = 0; v < vertices; v ++)
+				push(u, v);
 
-			// Relabel if label[u] <= every label[v]
 			relabel(u);
 
-		}while(u != -1);
-	}
-
-	int active() {
-
-		for(int u = 0; u < flow.vertices; u ++) {
-
-			if(u == s || u == t)
-				continue;
-
-			if(can_push(u) || can_relabel(u))
-				return u;
+			// Re-add to queue if there is still excess
+			if(excess[u] > 0)
+				queue.push(u);
 		}
-		return -1;
 	}
 
 	int residual(int u, int v) {
 		return capacity.at(u, v) - flow.at(u, v);
 	}
 
-	bool can_push(int u) {
+	bool push(int u, int v) {
 
 		if(excess[u] <= 0)
 			return false;
 
-		for(int v = 0; v < flow.vertices; v ++) {
+		// Except s, for Pre-Flow
+		if(label[u] != label[v] + 1 && u != s)
+			return false;
 
-			if(residual(u, v) > 0 && label[u] == label[v] + 1)
-				return true;
-		}
-		return false;
-	}
+		if(residual(u, v) <= 0)
+			return false;
 
-	void push(int u, int v) {
-
-		if(excess[u] <= 0 || label[u] != label[v] + 1)
-			return;
-
+		// Push flow through and create residial edge
 		int move = std::min(excess[u], residual(u, v));
 		flow.at(u, v) += move;
 		flow.at(v, u) += -move;
 		excess[u] -= move;
 		excess[v] += move;
+
+		// Add to queue
+		if(v != s && v != t)
+			queue.push(v);
+
+		return true;
 	}	
 
-	bool can_relabel(int u) {
-
-		if(excess[u] <= 0 || label[u] > flow.vertices-1)
-			return false;
-
-		int edges = 0;
-
-		for(int v = 0; v < flow.vertices; v ++) {
-
-			if(residual(u, v) > 0){
-				edges ++;
-
-				if(label[u] <= label[v])
-					continue;
-				else
-					return false;
-			}
-		}
-		return (edges > 0);
-	}
-
-	void relabel(int u) {
+	bool relabel(int u) {
 
 		if(excess[u] <= 0)
-			return ;
+			return false;
 
-		int min = -1;
+		// Look for the min adjacent label
+		int min = 2 * vertices;
 
-		for(int v = 0; v < flow.vertices; v ++) {
+		for(int v = 0; v < vertices; v ++) {
 
 			if(residual(u, v) > 0) {
 
-				if(label[u] <= label[v]) {
-
-					if(min == -1 || label[v] < min)
-						min = label[v];
-
-				}else
-					return;
+				if(label[v] < min)
+					min = label[v];
 			}
 		}
 
-		if(min != -1)
-			label[u] = 1 + min;
+		// Check for invalid labelling
+		if(min < label[u])
+			return false;
+
+		label[u] = 1 + min;
+		return true;
 	}
 
 	static graph max_flow(graph G, int s, int t) {
@@ -140,28 +111,44 @@ struct push_relabel {
 };
 
 int main(int argc, char** argv) {
-		
+
+	using clock = std::chrono::steady_clock;
+	using time = clock::time_point;
+
 	if(argc <= 1){
 		std::cout << "Usage: " << argv[0] << " graph_file\n";
 
 	}else if(argc >= 2) {
+
+		// Initialize graph
 		graph G(argv[1]);
-		graph residual = push_relabel::max_flow(G, 0, G.vertices-1);
 
-		int max_flow = 0;
+		time start, end;
+		double delta1, delta2;
 
-		for(int u = 0; u < G.vertices; u ++) {
-			for(int v = 0; v < G.vertices; v ++) {
-				
-				if(G.at(u, v) > 0)
-					std::cout << "u: " << u << " v: " << v << " " << residual.at(u, v) << "\n";
+		// Runtime analysis of Push-Relabel O(V^3)
+		start = clock::now();
+		graph residual1 = push_relabel::max_flow(G, 0, G.vertices-1);
+		end = clock::now();
+		delta1 = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
-				if(v == G.vertices-1)
-					max_flow += residual.at(u, v);
-			}
-		}
+		// Runtime analysis of Ford-Fulkerson O(VE^2) ~ O(V^5)
+		start = clock::now();		
+		graph residual2 = fordFulkerson(G, 0, G.vertices-1);
+		end = clock::now();
+		delta2 = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
 
-		std::cout << "Total flow: " << max_flow << "\n";
+		std::cout << "Showing Network Flows: \n";
+		print_flow_network(G, residual1);
+		print_flow_network(G, residual2);
+
+		std::cout << "-------------------------\n";
+
+		std::cout << "Algorithm\tRuntime\n";
+		std::cout << "Push Relabel\t" << delta1 << "\n";
+		std::cout << "Ford Fulkerson\t" << delta2 << "\n";
+		double pdiff = (1 - delta1 / delta2) * 100;
+		std::cout << "Push Relabel was " << pdiff << "% " << ((pdiff < 0) ? "slower\n" : "faster\n");
 	}
 	return 0;
 }

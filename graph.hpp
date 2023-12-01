@@ -24,6 +24,11 @@ struct graph {
 	int& at(int u, int v);
 };
 
+/*
+ * Print the flow network from a residual product graph
+ */
+void print_flow_network(graph G, graph residual);
+
 /* C++ Program to Implement Network Flow Problem
  * Gara Pruesse, starting with code from sanfoundry.com/cpp-program/network-flow-problem/
  * Oct 2023
@@ -94,6 +99,24 @@ graph::~graph() {
 int& graph::at(int u, int v) {
 	return buffer[u + v * vertices];
 }
+
+void print_flow_network(graph G, graph residual) {
+	int max_flow = 0;
+
+	for(int u = 0; u < G.vertices; u ++) {
+		for(int v = 0; v < G.vertices; v ++) {
+			
+			if(G.at(u, v) > 0) {
+				std::cout << "u: " << u << " v: " << v << " ";
+				std::cout << residual.at(u, v) << "/" << G.at(u, v) << "\n";
+			}
+
+			if(v == G.vertices-1)
+				max_flow += residual.at(u, v);
+		}
+	}
+	std::cout << "Total flow: " << max_flow << "\n";	
+}
  
 /*
  * Returns true if there is a path from source 's' to sink 't' in
@@ -156,7 +179,16 @@ graph fordFulkerson(graph G, int s, int t) {
 			residual.at(v, u) += path_flow;
 		}
 	}
-    return residual;
+
+	graph flow(G.vertices);
+
+	for(int u = 0; u < G.vertices; u ++) {
+		for(int v = 0; v < G.vertices; v ++) {
+			flow.at(u, v) = G.at(u, v) - residual.at(u, v);
+		}
+	}
+
+    return flow;
 }
 
 #endif
