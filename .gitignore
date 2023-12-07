@@ -1,3 +1,4 @@
 bin/*
-data/*
+!bin/README
+data/RT_*
 tests/graph_*
