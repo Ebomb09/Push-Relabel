@@ -1,0 +1,104 @@
+Algorithm: Push-Relabel
+Author: Ethan Bryson
+Date: Dec 7, 2023
+
+
+What does the algorithm do? I.e., what problem does it solve?
+    The algorithm solves the maximum flow problem in O(n^2m)
+
+
+Who created the algorithm(s)? I.e., give a history of the work on the problem.
+    In 1974 the idea of a preflow using pushing operations was first designed
+    by  Alexander V. Karzanov. Later Andrew V. Goldberg and Robert Tarjan in
+    1986 designed the Push-Relabel to be done O(n^2m) and O(n^3).
+
+
+What other algorithms do the same job -- how does this algorithm fit into the landscape? 
+    Ford Fulkerson can solve max flows in O(nm^2)
+
+    Push-Relabel is signficant for being able to compute it faster.
+
+
+How does the algorithm work?
+
+    Directed Graph (G)
+
+    Flow Network (F):
+        F = {G, s, t}
+
+    Vertex Excess (x): 
+        x[s] = infinity
+        x[u] = flow_in - flow_out
+
+    Residual Edge (c):  
+        c(u,v) = G(u,v) - F(u,v)
+
+    Vertex Label (l):
+        l[u] = 0
+        l[s] = V
+
+
+    Push (u):
+        foreach residual_edge(u -> v):
+            if label(u) == label(v) + 1:
+                push excess through edge
+                make residual edge
+
+    Relabel (u): 
+        min = infinity
+
+        foreach residual_edge(u -> v):
+            if(label(v) < min)
+                min = label(v)
+
+        if(label(u) > min)
+            return
+
+        label(u) = label(min) + 1
+
+
+    First it pushes through all edges of s to create a preflow. Then the 
+    algorithm works on a per node basis, if there is any excess flow, push 
+    / relabel until no more left.
+
+
+Why is it considered correct?
+    It is considered correct by first creating a preflow and then relabel such 
+    that the excess is funneled from the source to the sink. It will create a 
+    flow similar to the augmenting path where onces the flow saturates towards
+    the sink, vertices will then be forced to relabel so that the remaining excess
+    flows back to the source.
+
+
+What is the run time analysis?
+    Push:       O(m)
+    Relabel:    O(m) x O(n^2)
+
+    Each vertex n, will perform the push + relabel operation. The max number
+    of operations that any vertex can be perform is constrained by (n-2) relabels.
+    So any vertex can at most perform (n-2) push / relabels.
+
+    Runtime: O(n * (m + m) * (n-2)) = O(n^2m)
+
+    The runtime can be reduced down to O(n^3) by implementing a data structure that
+    performs push / relabels in O(n) time instead. A 2D array fits that requirement
+    where you can now query {Array[u][0], Array[u][1], ..., Array[u][n]}. The push-
+    relabel data structure I implemented uses that.
+
+    Effectively after running tests on the Push-Relabel and Ford Fulkerson algorithms 
+    where I calculated the maxflow from fully connected graphs of 3, 10, 100 and 1000 
+    vertices. I found that Ford Fulkerson grew at exponentially faster rate of *= n^1.57 
+    compared to Push-Relabel which would make sense considering that Ford Fulkerson can be 
+    expanded to O(n^5) whereas Push-Relabel expanded is O(n^3) and the averaging in nanoseconds
+    of actual computer runtime. (n^3*n^1.57) ~ significantly close to the O(n^5).
+
+
+How to use the program?
+    'make all'                  - compile all programs.
+    'make test'                 - run ford fulkerson & push-relabel on tests
+                                > 'tests/gen.py' where vertices = (V), number of tests = (tests)
+                                > all data from the tests is stored in the 'data/RT_algorithm_V.csv'
+
+    './bin/pr <graph_file>'     - run push-relabel on a graph
+    './bin/ff <graph_file>'     - run ford fulkerson on a graph
+                                > both programs will return "<maxflow>, <runtime>"
