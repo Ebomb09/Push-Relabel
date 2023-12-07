@@ -89,7 +89,7 @@ What is the run time analysis?
     where I calculated the maxflow from fully connected graphs of 3, 10, 100 and 1000 
     vertices. I found that Ford Fulkerson grew at exponentially faster rate of *= n^1.57 
     compared to Push-Relabel which would make sense considering that Ford Fulkerson can be 
-    expanded to O(n^5) whereas Push-Relabel expanded is O(n^3) and the averaging in nanoseconds
+    expanded to O(n^5) whereas Push-Relabel expanded is O(n^3) and the averaging in microseconds
     of actual computer runtime. (n^3*n^1.57) ~ significantly close to the O(n^5).
 
 
